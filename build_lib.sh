@@ -3,7 +3,7 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $SCRIPT_DIR	
 
-git clone --depth 1  git@github.com:ggerganov/whisper.cpp.git
+git clone --depth 1  https://github.com/ggerganov/whisper.cpp.git
 
 cd whisper.cpp
 
