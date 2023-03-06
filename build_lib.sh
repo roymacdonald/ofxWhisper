@@ -26,6 +26,9 @@ cp libwhisper.a ../libs/whisper_cpp/lib/osx/
 cp whisper.h ../libs/whisper_cpp/include/
 cp ggml.h ../libs/whisper_cpp/include/
 cp models/ggml-base.en.bin ../libs/whisper_cpp/models/
+cp models/ggml-base.en.bin ../example/bin/data/models/
+
+
 
 cd ..
 rm -rf whisper.cpp

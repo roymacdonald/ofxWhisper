@@ -29,4 +29,7 @@ cd your_openframeworks_folder/addons/ofxWhisper
 .build_lib.sh
 ```
 
+## Last but not least
+Remember to update the example project using Project Generator
+
 
