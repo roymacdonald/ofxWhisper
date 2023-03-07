@@ -88,6 +88,7 @@ linux64:
 	# pkg-config
 	# ADDON_PKG_CONFIG_LIBRARIES =
 vs:
+	 ADDON_LIBS = libs/whisper_cpp/lib/vs/whisper.lib
 	# After compiling copy the following dynamic libraries to the executable directory
 	# only windows visual studio
 	# ADDON_DLLS_TO_COPY = 
