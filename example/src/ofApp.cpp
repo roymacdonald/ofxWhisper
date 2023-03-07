@@ -23,27 +23,29 @@ void ofApp::setup(){
         
     
     whisper.setup(whisperSettings);
-    
-    soundStream.printDeviceList();
-    
     ofSoundStreamSettings settings;
+    soundStream.printDeviceList();
 
-    // if you want to set the device id to be different than the default
-    // auto devices = soundStream.getDeviceList();
-    // settings.device = devices[4];
+#ifdef TARGET_WIN32
+    // set your device to the correct api. otherwise it might not work.
+    //windows is a bit quirky about this.
+     auto devices = soundStream.getDeviceList(ofSoundDevice::Api::MS_WASAPI);
+     
+     for (size_t i = 0; i < devices.size(); i++) {
+         cout << i << "  : " << devices[i].name << endl;
+     }
+     // remember to choose the correct input device.
+     settings.setInDevice(devices[1]);
+     settings.setApi(ofSoundDevice::Api::MS_WASAPI);
 
-    // you can also get devices for an specific api
-    // auto devices = soundStream.getDevicesByApi(ofSoundDevice::Api::PULSE);
-    // settings.device = devices[0];
-
-    // or get the default device for an specific api:
-    // settings.api = ofSoundDevice::Api::PULSE;
-
-    // or by name
+#else
     auto devices = soundStream.getMatchingDevices("default");
-    if(!devices.empty()){
+    if (!devices.empty()) {
         settings.setInDevice(devices[0]);
     }
+
+#endif   
+
 
     
     settings.setInListener(whisper.audio_input.get());
