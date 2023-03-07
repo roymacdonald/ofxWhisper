@@ -60,6 +60,8 @@ local.properties
 *.tags
 *.workspace.*
 
+*/.vs/
+
 #########################
 # operating system
 #########################
@@ -105,3 +107,6 @@ Desktop.ini
 *.log
 *.sql
 *.sqlite
+
+libs/whisper_cpp/models/
+libs/whisper_cpp/models/*

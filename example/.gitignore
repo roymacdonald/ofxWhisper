@@ -1,0 +1,106 @@
+###########################
+# ignore folders
+###########################
+###########################
+# ignore generated binaries
+# but not the data folder
+###########################
+
+*/bin/*
+!*/bin/data/
+*/bin/data/*.xml
+*/bin/data/*/*.xml
+*/.vs/
+.vs/
+
+bin/data/models/
+#########
+# general
+#########
+
+[Bb]uild/
+[Oo]bj/
+*.o
+[Dd]ebug*/
+[Rr]elease*/
+*.mode*
+*.app/
+*.pyc
+.svn/
+*.log
+
+addons/
+
+########################
+# IDE files which should
+# be ignored
+########################
+
+# XCode
+*.pbxuser
+*.perspective
+*.perspectivev3
+*.mode1v3
+*.mode2v3
+# XCode 4
+*.xccheckout
+xcuserdata/
+*.xcodeproj/
+openFrameworks-Info.plist
+
+config.make
+Project.xcconfig
+Makefile
+
+# Visual Studio
+*.sln
+*.vcxproj
+*.vcxproj.*
+*.vcxproj.filters
+*.vcxproj.user
+*.filters
+*.sdf
+*.opensdf
+*.suo
+*.pdb
+*.ilk
+*.aps
+ipch/
+
+# Eclipse
+.metadata
+local.properties
+.externalToolBuilders
+
+# Android Studio
+.gradle
+/local.properties
+/.idea/workspace.xml
+/.idea/libraries
+
+##################
+# operating system
+##################
+
+# Linux
+*~
+# KDE
+.directory
+.AppleDouble
+
+# OSX
+.DS_Store
+*.swp
+*~.nib
+# Thumbnails
+._*
+
+# Windows
+# Image file caches
+Thumbs.db
+# Folder config file
+Desktop.ini
+
+# Android
+.csettings
+
