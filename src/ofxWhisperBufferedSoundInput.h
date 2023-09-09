@@ -2,32 +2,34 @@
 #include "ofMain.h"
 
 #include "ofxSamplerate.h"
+#include <atomic>
+#include "LockFreeRingBuffer.h"
 
-class ofxWhisperBufferedSoundInput: public ofBaseSoundInput {
+class ofxWhisperBufferedSoundInput:
+public ofBaseSoundInput {
 public:
-    ofxWhisperBufferedSoundInput(int length_ms);
-    
-    
-    bool clear();
-
+    ofxWhisperBufferedSoundInput();
+    virtual ~ofxWhisperBufferedSoundInput();
+       
 
     // get audio data from the circular buffer
     void get(int ms, std::vector<float> & audio);
-//protected:
-        virtual void audioIn( ofSoundBuffer& buffer ) override;
 
+    virtual void audioIn( ofSoundBuffer& buffer ) override;
+
+    void draw(const ofRectangle& rect);
+    
+    bool setup(int deviceIndex , int inSampleRate, int bufferSize = 256 , ofSoundDevice::Api api = ofSoundDevice::Api::UNSPECIFIED);
+    ofSoundStream m_soundStream;
+    
+    
+protected:
+    std::unique_ptr<ofxSamplerate> sampleRateConverter = nullptr;
+    std::unique_ptr<LockFreeRingBuffer> ringBuffer = nullptr;
 private:
-
-    ofxSamplerate sampleRateConverter;
-    int m_len_ms = 0;
-    int m_sample_rate = 0;
-
-    // std::atomic_bool m_running;
-    std::mutex       m_mutex;
-
-    std::vector<float> m_audio;
-    std::vector<float> m_audio_new;
-    size_t             m_audio_pos = 0;
-    size_t             m_audio_len = 0;
+   
+    std::atomic<bool> _isSetup;
+    std::atomic<float> _rms;
+    std::atomic<float> _peak;
 };
 

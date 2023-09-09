@@ -1,110 +1,119 @@
 #include "ofxWhisperBufferedSoundInput.h"
 #include "whisper.h"
 
-ofxWhisperBufferedSoundInput::ofxWhisperBufferedSoundInput(int length_ms) {
-    m_len_ms = length_ms;
-
-    m_sample_rate = WHISPER_SAMPLE_RATE;
-    
-    m_audio.resize((m_sample_rate*m_len_ms)/1000);
-
+ofxWhisperBufferedSoundInput::ofxWhisperBufferedSoundInput():
+_isSetup(0),
+_rms(0),
+_peak(0)
+{
 
 }
 
-bool ofxWhisperBufferedSoundInput::clear() {
-    
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
+ofxWhisperBufferedSoundInput::~ofxWhisperBufferedSoundInput(){
+    m_soundStream.stop();
+    m_soundStream.close();
+}
 
-        m_audio_pos = 0;
-        m_audio_len = 0;
+template<typename T>
+static T getMaxValue(const std::vector<T>& values){
+    T mx = 0;
+    for(const auto & v: values){
+        if((v > mx) || (v*-1) > mx){
+            mx = (v > 0)?v:(v*-1);
+        }
     }
+    return mx;
+}
 
-    return true;
+void ofxWhisperBufferedSoundInput::draw(const ofRectangle& rect){
+    
+    ofSetColor(0);
+    ofFill();
+    ofDrawRectangle(rect);
+    
+    ofSetColor(ofColor::blue);
+    float h = rect.height * _rms.load();
+    ofDrawRectangle(rect.x, rect.height - h, rect.width, h );
+    
+    ofSetColor(ofColor:: yellow);
+    float y = ofMap(_peak.load(), 0, 1, rect.getMaxY(), rect.getMinY());
+
+    ofSetLineWidth(3);
+    ofDrawLine(rect.getMinX(), y, rect.getMaxX(), y);
+    
+    ofSetColor(200);
+    ofNoFill();
+    ofDrawRectangle(rect);
+    
+    stringstream ss;
+    
+    ss << "rms:\n " << _rms.load() << "\npeak:\n" << _peak.load();
+    
+    ofDrawBitmapStringHighlight(ss.str(), rect.x, rect.getMaxX() + 20);
+    
 }
 
 //void ofxWhisperBufferedSoundInput::callback(uint8_t * stream, int len) {
 void ofxWhisperBufferedSoundInput::audioIn( ofSoundBuffer& buffer ) {
-//    if (!m_running) {
-//        return;
-//    }
+    if(_isSetup.load()){
+         if(ringBuffer){
+             if(!sampleRateConverter){
+                 sampleRateConverter = make_unique<ofxSamplerate>() ;
+             }
+             
+             ofSoundBuffer converted;
+             
+             sampleRateConverter->changeSampleRate(buffer, converted, WHISPER_SAMPLE_RATE);
+             
+             ringBuffer->writeFromBuffer(converted);
+             _rms = converted.getRMSAmplitude();
+             _peak = getMaxValue(converted.getBuffer());
+         }
+     }
+ }
 
-    size_t n_samples ;
-
-    if(WHISPER_SAMPLE_RATE != buffer.getSampleRate()){
-        ofSoundBuffer converted;
-        sampleRateConverter.changeSampleRate(buffer, converted, WHISPER_SAMPLE_RATE);
-        
-        n_samples = converted.getNumFrames();
-        if(converted.getNumChannels() == 1){
-            m_audio_new = converted.getBuffer();
-        }else{
-            m_audio_new.resize(n_samples);
-            converted.copyTo(m_audio_new.data(), converted.getNumFrames(), 1, 0, false) ;
-        }
-    }else{
-        n_samples = buffer.getNumFrames();
-        if(buffer.getNumChannels() == 1){
-            m_audio_new = buffer.getBuffer();
-        }else{
-            m_audio_new.resize(n_samples);
-            buffer.copyTo(m_audio_new.data(), buffer.getNumFrames(), 1, 0, false) ;
-        }
-    }
- 
- 
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-
-        if (m_audio_pos + n_samples > m_audio.size()) {
-            const size_t n0 = m_audio.size() - m_audio_pos;
-
-            memcpy(&m_audio[m_audio_pos], &m_audio_new[0], n0 * sizeof(float));
-            memcpy(&m_audio[0], &m_audio_new[n0], (n_samples - n0) * sizeof(float));
-
-            m_audio_pos = (m_audio_pos + n_samples) % m_audio.size();
-            m_audio_len = m_audio.size();
-        } else {
-            memcpy(&m_audio[m_audio_pos], &m_audio_new[0], n_samples * sizeof(float));
-
-            m_audio_pos = (m_audio_pos + n_samples) % m_audio.size();
-            m_audio_len = std::min(m_audio_len + n_samples, m_audio.size());
-        }
-    }
-}
 
 void ofxWhisperBufferedSoundInput::get(int ms, std::vector<float> & result) {
-   
+    if(!_isSetup.load() ) return;
+    
+    size_t n_samples = WHISPER_SAMPLE_RATE * ms / 1000.0f;
 
-    result.clear();
+    result.resize(n_samples);
 
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-
-        if (ms <= 0) {
-            ms = m_len_ms;
-        }
-
-        size_t n_samples = (m_sample_rate * ms) / 1000;
-        if (n_samples > m_audio_len) {
-            n_samples = m_audio_len;
-        }
-
-        result.resize(n_samples);
-
-        int s0 = m_audio_pos - n_samples;
-        if (s0 < 0) {
-            s0 += m_audio.size();
-        }
-
-        if (s0 + n_samples > m_audio.size()) {
-            const size_t n0 = m_audio.size() - s0;
-
-            memcpy(result.data(), &m_audio[s0], n0 * sizeof(float));
-            memcpy(&result[n0], &m_audio[0], (n_samples - n0) * sizeof(float));
-        } else {
-            memcpy(result.data(), &m_audio[s0], n_samples * sizeof(float));
-        }
+    if(ringBuffer){
+        ringBuffer->readIntoVector(result);
     }
 }
 
+bool ofxWhisperBufferedSoundInput::setup(int deviceIndex , int inSampleRate, int bufferSize, ofSoundDevice::Api api){
+    
+    auto devices = m_soundStream.getDeviceList(api);
+        if ( deviceIndex < devices.size()) {
+            int i = deviceIndex;
+            ofSoundStreamSettings m_soundSettings;
+            
+            m_soundSettings.setInDevice(devices[i]);
+            m_soundSettings.setInListener(this);
+            m_soundSettings.numInputChannels = devices[i].inputChannels;
+            
+            //You can pass 0 as the value for inSampleRate and then the value will be the highest one available in the chosen device
+            m_soundSettings.sampleRate = (inSampleRate > 0)?inSampleRate:getMaxValue(devices[i].sampleRates);
+            m_soundSettings.numBuffers = 2;
+            m_soundSettings.bufferSize = bufferSize;
+            
+//            ofLogNotice("BufferedAudioInput::setup") << "setting audio device " << i << ": " << devices[i].name << " sampleRate: " << m_soundSettings.sampleRate;
+            
+            
+            size_t outBufferSize = bufferSize * WHISPER_SAMPLE_RATE/(float)m_soundSettings.sampleRate;
+            
+            ringBuffer = make_unique<LockFreeRingBuffer>(m_soundSettings.numInputChannels * outBufferSize * 100);// make the ring buffer 10 times larger than the input buffers. This size is enough to perform the most commmon sampleRate convertions, etc
+            
+            m_soundStream.setup(m_soundSettings);
+                    
+            _isSetup = true;
+            return true;
+        }
+    
+    _isSetup = false;
+    return false;
+}
