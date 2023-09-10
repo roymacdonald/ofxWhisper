@@ -110,3 +110,5 @@ Desktop.ini
 
 libs/whisper_cpp/models/
 libs/whisper_cpp/models/*
+whisper.cpp/
+whisper.cpp/*
