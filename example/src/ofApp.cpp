@@ -4,9 +4,9 @@
 void ofApp::setup(){
     ofxWhisperSettings whisperSettings;
     /// Using the default settings which are. Uncomment any line below and change value if needed
-    // whisperSettings.n_threads  = std::min(4, (int32_t) std::thread::hardware_concurrency());        //n_threads "number of threads to use during computation\n", ;
-    // whisperSettings.step_ms    = 3000;     //step_ms "audio step size in milliseconds\n",             ;
-    // whisperSettings.length_ms  = 10000;     //length_ms "audio length in milliseconds\n",                ;
+     whisperSettings.n_threads  = std::min(4, (int32_t) std::thread::hardware_concurrency());        //n_threads "number of threads to use during computation\n", ;
+     whisperSettings.step_ms    = 2000;     //step_ms "audio step size in milliseconds\n",             ;
+     whisperSettings.length_ms  = 5000;     //length_ms "audio length in milliseconds\n",                ;
     // whisperSettings.keep_ms    = 200;     //keep_ms "audio to keep from previous step in ms\n",      ;
     // whisperSettings.capture_id = -1;    //capture_id "capture device ID\n",                           ;
     // whisperSettings.max_tokens = 32;    //max_tokens "maximum number of tokens per audio chunk\n",    ;
@@ -20,12 +20,16 @@ void ofApp::setup(){
     // whisperSettings.no_timestamps = false; 
     // whisperSettings.language  = "en"; //"spoken language\n",
     // whisperSettings.model     = "models/ggml-base.en.bin"; //"model path\n",
-        
+    whisperSettings.model =  "/Users/roy/openFrameworks/addons/ofxWhisper/libs/whisper_cpp/models/ggml-base.en.bin";
+//    whisperSettings.model =  "/Users/roy/openFrameworks/addons/ofxWhisper/libs/whisper_cpp/models/ggml-large.bin";
     
-    whisper.setup(whisperSettings);
-    ofSoundStreamSettings settings;
+   
+   
+    ofSoundStream soundStream;
     soundStream.printDeviceList();
 
+    ofSoundDevice::Api api = ofSoundDevice::Api::UNSPECIFIED;
+    
 #ifdef TARGET_WIN32
     // set your device to the correct api. otherwise it might not work.
     //windows is a bit quirky about this.
@@ -34,26 +38,22 @@ void ofApp::setup(){
      for (size_t i = 0; i < devices.size(); i++) {
          cout << i << "  : " << devices[i].name << endl;
      }
-     // remember to choose the correct input device.
-     settings.setInDevice(devices[1]);
-     settings.setApi(ofSoundDevice::Api::MS_WASAPI);
-
-#else
-    auto devices = soundStream.getMatchingDevices("default");
-    if (!devices.empty()) {
-        settings.setInDevice(devices[0]);
-    }
+         
+     api = ofSoundDevice::Api::MS_WASAPI;
 
 #endif   
 
+    
+    
+    // remember to choose the correct input device.
+    int inputDeviceIndex = 3;
+    int inSampleRate = 48000;
+    int bufferSize = 512;
 
     
-    settings.setInListener(whisper.audio_input.get());
-    settings.sampleRate = 48000;
-    settings.numOutputChannels = 0;
-    settings.numInputChannels = 1;
-    settings.bufferSize = 1024;
-    soundStream.setup(settings);
+    whisper.setup(whisperSettings, inputDeviceIndex , inSampleRate, bufferSize , api);
+    
+
 
 
 }
@@ -71,13 +71,18 @@ void ofApp::update(){
 
 //--------------------------------------------------------------
 void ofApp::draw(){
+    
+    ofRectangle r = whisper.draw();
+    
     ofBitmapFont bf;
-    float y = 20;
+    float y = r.getMaxY() + 20;
     for(auto& t: textQueue){
         auto r= bf.getBoundingBox(t, 0, 0);
-        ofDrawBitmapStringHighlight(t, 20, y );
+        ofDrawBitmapStringHighlight(t, 80, y );
         y += r.height + 8;	
     }
+    
+    
 }
 
 //--------------------------------------------------------------
@@ -87,7 +92,9 @@ void ofApp::keyPressed(int key){
 
 //--------------------------------------------------------------
 void ofApp::keyReleased(int key){
-
+    if(key == ' '){
+        whisper.toggleWaveBypass();
+    }
 }
 
 //--------------------------------------------------------------

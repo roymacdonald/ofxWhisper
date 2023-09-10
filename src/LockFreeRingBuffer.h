@@ -73,7 +73,9 @@ public:
     
     
     size_t getReadPosition();
-
+    
+    ///\brief get the number of readable samples
+    size_t getNumReadableSamples() const;
 
 private:
     
@@ -94,9 +96,7 @@ private:
     ///\brief Call this function after finished reading. will move the readIndex by numSamples
     ///\param numSamples is the number of samples that where actually read
     void readEnd(size_t numSamples);
-    
-    ///\brief get the number of readable samples
-    size_t getNumReadableSamples() const;
+
     
     
     std::atomic<size_t>    _readStart;

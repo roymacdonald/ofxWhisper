@@ -4,7 +4,8 @@
 ofxWhisperBufferedSoundInput::ofxWhisperBufferedSoundInput():
 _isSetup(0),
 _rms(0),
-_peak(0)
+_peak(0),
+_numChannels(0)
 {
 
 }
@@ -25,7 +26,7 @@ static T getMaxValue(const std::vector<T>& values){
     return mx;
 }
 
-void ofxWhisperBufferedSoundInput::draw(const ofRectangle& rect){
+ofRectangle ofxWhisperBufferedSoundInput::draw(const ofRectangle& rect){
     
     ofSetColor(0);
     ofFill();
@@ -45,12 +46,19 @@ void ofxWhisperBufferedSoundInput::draw(const ofRectangle& rect){
     ofNoFill();
     ofDrawRectangle(rect);
     
+    ofRectangle r = rect;
+    
     stringstream ss;
     
     ss << "rms:\n " << _rms.load() << "\npeak:\n" << _peak.load();
     
-    ofDrawBitmapStringHighlight(ss.str(), rect.x, rect.getMaxX() + 20);
+    auto x = rect.x;
+    y = rect.getMaxY() + 20;
     
+    ofDrawBitmapStringHighlight(ss.str(), x, y);
+    auto bb = bf.getBoundingBox(ss.str(), x, y);
+    r.growToInclude(bb);
+    return r;
 }
 
 //void ofxWhisperBufferedSoundInput::callback(uint8_t * stream, int len) {
@@ -60,6 +68,8 @@ void ofxWhisperBufferedSoundInput::audioIn( ofSoundBuffer& buffer ) {
              if(!sampleRateConverter){
                  sampleRateConverter = make_unique<ofxSamplerate>() ;
              }
+             
+             _numChannels = buffer.getNumChannels();
              
              ofSoundBuffer converted;
              
@@ -72,20 +82,45 @@ void ofxWhisperBufferedSoundInput::audioIn( ofSoundBuffer& buffer ) {
      }
  }
 
-
-void ofxWhisperBufferedSoundInput::get(int ms, std::vector<float> & result) {
-    if(!_isSetup.load() ) return;
-    
-    size_t n_samples = WHISPER_SAMPLE_RATE * ms / 1000.0f;
-
-    result.resize(n_samples);
-
-    if(ringBuffer){
-        ringBuffer->readIntoVector(result);
+bool ofxWhisperBufferedSoundInput::hasBufferedMs(uint64_t millis){
+    if(ringBuffer && _numChannels.load() > 0){
+        
+        return (ringBuffer->getNumReadableSamples() >= (_numChannels.load() * WHISPER_SAMPLE_RATE * millis)/1000.0f);
     }
+    
+    return false;
+    
 }
 
-bool ofxWhisperBufferedSoundInput::setup(int deviceIndex , int inSampleRate, int bufferSize, ofSoundDevice::Api api){
+
+bool ofxWhisperBufferedSoundInput::get(ofSoundBuffer& buffer){
+    if(!_isSetup.load() || _numChannels.load() == 0) return false;
+    
+    if(ringBuffer){
+        ringBuffer->readIntoBuffer(buffer);
+        return true;
+    }
+    return false;
+    
+}
+
+//bool ofxWhisperBufferedSoundInput::get(int ms, std::vector<float> & result) {
+//    if(!_isSetup.load() || _numChannels.load() == 0) return false;
+//    
+//    size_t n_samples = _numChannels.load() * WHISPER_SAMPLE_RATE * ms / 1000.0f;
+//
+//    result.resize(n_samples);
+//    
+//    if(ringBuffer){
+//        ringBuffer->readIntoVector(result);
+//        return true;
+//    }
+//    return false;
+//}
+
+
+
+bool ofxWhisperBufferedSoundInput::setup(int deviceIndex , int inSampleRate, int bufferSize, int waitDurationMs, ofSoundDevice::Api api){
     
     auto devices = m_soundStream.getDeviceList(api);
         if ( deviceIndex < devices.size()) {
@@ -103,10 +138,11 @@ bool ofxWhisperBufferedSoundInput::setup(int deviceIndex , int inSampleRate, int
             
 //            ofLogNotice("BufferedAudioInput::setup") << "setting audio device " << i << ": " << devices[i].name << " sampleRate: " << m_soundSettings.sampleRate;
             
+            wait_duration = waitDurationMs;
             
-            size_t outBufferSize = bufferSize * WHISPER_SAMPLE_RATE/(float)m_soundSettings.sampleRate;
             
-            ringBuffer = make_unique<LockFreeRingBuffer>(m_soundSettings.numInputChannels * outBufferSize * 100);// make the ring buffer 10 times larger than the input buffers. This size is enough to perform the most commmon sampleRate convertions, etc
+            
+            ringBuffer = make_unique<LockFreeRingBuffer>(m_soundSettings.numInputChannels * WHISPER_SAMPLE_RATE * (waitDurationMs/1000.0f)*5);// make the ring buffer 10 times larger than the input buffers. This size is enough to perform the most commmon sampleRate convertions, etc
             
             m_soundStream.setup(m_soundSettings);
                     

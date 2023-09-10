@@ -61,7 +61,15 @@ void LockFreeRingBuffer::allocate(size_t size){
 
 //------------------------------------------------------------------------------------------------
 size_t LockFreeRingBuffer::getNumReadableSamples() const{
-    return _writeStart.load() - _readStart.load();
+    auto writeStart = _writeStart.load();
+    auto readStart = _readStart.load();
+
+    
+    size_t readable = 0;
+    if(writeStart > readStart){
+        return std::min(writeStart - readStart, _samples);
+    }
+    return 0;
 }
 //------------------------------------------------------------------------------------------------
 size_t LockFreeRingBuffer::writeBegin(float *&first, size_t &firstCount, float *&second, size_t &secondCount)

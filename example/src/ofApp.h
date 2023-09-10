@@ -24,7 +24,7 @@ class ofApp : public ofBaseApp{
 		void gotMessage(ofMessage msg);
 	
     
-    ofSoundStream soundStream;
+    
     ofxWhisper whisper;
     deque<string> textQueue;
 };
