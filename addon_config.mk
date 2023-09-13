@@ -99,7 +99,7 @@ android/armeabi:
 android/armeabi-v7a:	
 osx:
 	# osx/iOS only, any framework that should be included in the project
-	# ADDON_FRAMEWORKS =
+	ADDON_FRAMEWORKS = CoreML
 ios:
 tvos:
 
