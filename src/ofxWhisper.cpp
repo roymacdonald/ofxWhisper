@@ -1,4 +1,5 @@
 #include "ofxWhisper.h"
+#include "ofxWhisperUtils.h"
 
 //-----------------------------------------------------------------------------------------------
 std::string ofxWhisper::to_timestamp(int64_t t) {
@@ -16,13 +17,106 @@ std::string ofxWhisper::to_timestamp(int64_t t) {
 //-----------------------------------------------------------------------------------------------
 ofxWhisper::ofxWhisper():
 updatePeriod(0)
-//#ifdef USING_OFX_SOUND_OBJECTS
-//: ofxSoundObject(OFX_SOUND_OBJECT_PROCESSOR)
-//#endif
 {
+}
+//-----------------------------------------------------------------------------------------------
+ofxWhisper::~ofxWhisper(){
+    wait_cond_var.notify_all();
+    if(isThreadRunning()){
+        waitForThread(true, 5000);
+    }
     
+    if(bIsSetup || ctx){
+        whisper_print_timings(ctx);
+        whisper_free(ctx);
+    }
+ 
     
 }
+
+//-----------------------------------------------------------------------------------------------
+void ofxWhisper::setup(const ofxWhisperSettings& _settings, int numInputChannels){
+    this->settings = _settings;
+    settings.model = ofToDataPath(settings.model, true);
+    settings.keep_ms   = std::min(settings.keep_ms,   settings.step_ms);
+    settings.length_ms = std::max(settings.length_ms, settings.step_ms);
+    
+    n_samples_step = (1e-3*settings.step_ms  )*WHISPER_SAMPLE_RATE;
+    n_samples_len  = (1e-3*settings.length_ms)*WHISPER_SAMPLE_RATE;
+    n_samples_keep = (1e-3*settings.keep_ms  )*WHISPER_SAMPLE_RATE;
+    
+    use_vad = n_samples_step <= 0; // sliding window mode uses VAD
+    
+    ofLogNotice(" ofxWhisper::setup") << "Use VAD: " << boolalpha << use_vad;
+    
+    n_new_line = !use_vad ? std::max(1, settings.length_ms / settings.step_ms - 1) : 1; // number of steps to print new line
+    
+    settings.no_timestamps  = !use_vad;
+    settings.no_context    |= use_vad;
+    settings.max_tokens     = 0;
+    
+    audio_input = make_unique<ofxWhisperBufferResampler>();
+    
+    audio_input->setup(numInputChannels, settings.length_ms *5);
+    
+    
+    if (whisper_lang_id(settings.language.c_str()) == -1) {
+        ofLogError("ofxWhisper::setup") << "error: unknown language " << settings.language;
+        bIsSetup = false;
+        return;
+    }
+    
+    ctx = whisper_init_from_file(settings.model.c_str());
+    
+    if (!whisper_is_multilingual(ctx)) {
+        if (settings.language != "en" || settings.translate) {
+            settings.language = "en";
+            settings.translate = false;
+            ofLogWarning ("ofxWhisper::setup") << " WARNING: model is not multilingual, ignoring language and translation options";
+        }
+    }
+    
+
+    
+    ofLogNotice("ofxWhisper::setup") << getInfoString();
+    
+    
+    ofLogNotice("ofxWhisper") << "[Start speaking]";
+
+    _lastUpdateStartTime = std::chrono::system_clock::now();
+    _lastUpdateEndTime = std::chrono::system_clock::now();
+
+    bIsSetup = true;
+    
+    startThread();
+}
+//-----------------------------------------------------------------------------------------------
+bool ofxWhisper::setupAudioInput(const ofxWhisperSettings& whisperSettings, size_t deviceIndex, int sampleRate, int bufferSize, ofSoundDevice::Api api){
+    soundStream = make_unique<ofSoundStream> ();
+    
+    auto devices = soundStream->getDeviceList(api);
+    if ( deviceIndex < devices.size()) {
+        int i = deviceIndex;
+        
+        setup(whisperSettings, devices[i].inputChannels);
+                
+        ofSoundStreamSettings settings;
+        
+        settings.setInDevice(devices[i]);
+        settings.setInListener(this);
+
+        settings.numInputChannels = devices[i].inputChannels;
+        
+        //You can pass 0 as the value for inSampleRate and then the value will be the highest one available in the chosen device
+        settings.sampleRate = (sampleRate > 0)?sampleRate:getMaxValue(devices[i].sampleRates);
+        settings.numBuffers = 2;
+        settings.bufferSize = bufferSize;
+        
+        return soundStream->setup(settings);
+    }
+    return false;
+}
+
 //-----------------------------------------------------------------------------------------------
 ofRectangle ofxWhisper::draw(){
   
@@ -44,35 +138,7 @@ ofRectangle ofxWhisper::draw(){
     ofDrawBitmapStringHighlight(ss.str(), x,y);
     
     return  r;
-//    if(wave.isEmpty()){
-//        ofRectangle r (0,0,ofGetWidth(), ofGetHeight());///3);
-////        wave.setup(r);
-////        r.y = r.getMaxY();
-////        wave_old.setup(r);
-////        r.y = r.getMaxY();
-//        wave_new.setup(r);
-//
-//    }
-//
-////    wave.draw();
-//    wave_new.draw();
-////    wave_old.draw();
-//
-    
-    
-}
-//-----------------------------------------------------------------------------------------------
-ofxWhisper::~ofxWhisper(){
-    wait_cond_var.notify_all();
-    if(isThreadRunning()){
-        waitForThread(true, 5000);
-    }
-    
-    if(bIsSetup || ctx){
-        whisper_print_timings(ctx);
-        whisper_free(ctx);
-    }
- 
+
     
 }
 
@@ -107,72 +173,7 @@ std::string ofxWhisper::getInfoString(){
 }
 
 //-----------------------------------------------------------------------------------------------
-void ofxWhisper::setup(ofxWhisperSettings _settings, int inputDeviceIndex , int inSampleRate, int bufferSize , ofSoundDevice::Api api){
-    this->settings = _settings;
-    settings.model = ofToDataPath(settings.model, true);
-    settings.keep_ms   = std::min(settings.keep_ms,   settings.step_ms);
-    settings.length_ms = std::max(settings.length_ms, settings.step_ms);
-    
-    n_samples_step = (1e-3*settings.step_ms  )*WHISPER_SAMPLE_RATE;
-    n_samples_len  = (1e-3*settings.length_ms)*WHISPER_SAMPLE_RATE;
-    n_samples_keep = (1e-3*settings.keep_ms  )*WHISPER_SAMPLE_RATE;
-    
-    use_vad = n_samples_step <= 0; // sliding window mode uses VAD
-//    use_vad = false;
-    
-    ofLogNotice(" ofxWhisper::setup") << "Use VAD: " << boolalpha << use_vad;
-    
-    n_new_line = !use_vad ? std::max(1, settings.length_ms / settings.step_ms - 1) : 1; // number of steps to print new line
-    
-    settings.no_timestamps  = !use_vad;
-    settings.no_context    |= use_vad;
-    settings.max_tokens     = 0;
-    
-    audio_input = make_unique<ofxWhisperBufferedSoundInput>();
-    audio_input->setup(inputDeviceIndex , inSampleRate, bufferSize , settings.step_ms,  api);
-    
-    
-    
-    if (whisper_lang_id(settings.language.c_str()) == -1) {
-        ofLogError("ofxWhisper::setup") << "error: unknown language " << settings.language;
-        bIsSetup = false;
-        return;
-    }
-    
-    ctx = whisper_init_from_file(settings.model.c_str());
-    
-    if (!whisper_is_multilingual(ctx)) {
-        if (settings.language != "en" || settings.translate) {
-            settings.language = "en";
-            settings.translate = false;
-            ofLogWarning ("ofxWhisper::setup") << " WARNING: model is not multilingual, ignoring language and translation options";
-        }
-    }
-    
-//    const int n_samples_30s  = 30 * WHISPER_SAMPLE_RATE;
-//    pcmf32.resize    (n_samples_30s, 0.0f);
-//    pcmf32_new.resize(n_samples_30s, 0.0f);
-//
-    
-    
-    ofLogNotice("ofxWhisper::setup") << getInfoString();
-    
-    
-    ofLogNotice("ofxWhisper") << "[Start speaking]";
-
-    
-//    size_t outBuffsize = (WHISPER_SAMPLE_RATE *bufferSize)/ (float)inSampleRate;
-    
-//    wave_new.allocate(100* outBuffsize, audio_input->getNumChannels());
-    
-//    t_last  = ofGetElapsedTimeMillis();
-//    t_start = t_last;
-    bIsSetup = true;
-    
-    startThread();
-}
-//-----------------------------------------------------------------------------------------------
-bool ofxWhisper::_isReadToUpdate(){
+bool ofxWhisper::_isReadyToUpdate(){
     if(audio_input){
         return audio_input->hasBufferedMs(settings.step_ms);
     }
@@ -182,28 +183,40 @@ bool ofxWhisper::_isReadToUpdate(){
 void ofxWhisper::threadedFunction() {
     
     
-    auto wait_predicate = std::bind(std::mem_fn(&ofxWhisper::_isReadToUpdate), this);
+    auto wait_predicate = std::bind(std::mem_fn(&ofxWhisper::_isReadyToUpdate), this);
     
     while(isThreadRunning()){
         
-        auto timePoint = std::chrono::system_clock::now() + std::chrono::milliseconds(settings.step_ms);
-        std::unique_lock<std::mutex> uLock(wait_mutex);
-        if (wait_cond_var.wait_until(uLock, timePoint, wait_predicate))
-        {
-            auto now = ofGetElapsedTimeMicros();
-            if(lastUpdate > 0){
-                updatePeriod = now - lastUpdate;
+        auto lastUpdateDuration = _lastUpdateEndTime - _lastUpdateStartTime;
+        updatePeriod = std::chrono::microseconds(lastUpdateDuration).count();
+        auto stepDuration = std::chrono::milliseconds(settings.step_ms);
+        if(lastUpdateDuration >= stepDuration ){
+            ofLogNotice()<< "lastUpdateDuration >= stepDuration : " ;//<< lastUpdateDuration << " >= " << stepDuration;
+            while(true){
+                if(_isReadyToUpdate()){
+                    break;
+                }
+                sleep(2);
             }
+             
             update();
-            lastUpdate = now;
-
+            
+        }else{
+            
+            auto timePoint = std::chrono::system_clock::now() + (stepDuration - lastUpdateDuration);
+            std::unique_lock<std::mutex> uLock(wait_mutex);
+            if (wait_cond_var.wait_until(uLock, timePoint, wait_predicate))
+            {
+                update();
+            }
+            else // timeout occured, conditions are not fulfilled
+            {
+                ofLogError("ofxWhisper::threadedFunction") << "wait_until return false.";
+                // e.g. do some error handling
+            }
         }
-        else // timeout occured, conditions are not fulfilled
-        {
-            ofLogError("ofxWhisper::threadedFunction") << "wait_until return false.";
-            // e.g. do some error handling
-        }
 
+  
     }
 }
 
@@ -234,11 +247,7 @@ void ofxWhisper::_updateNoVAD(){
         }
     }
 }
-void ofxWhisper::toggleWaveBypass(){
-//    wave.setBypassed(!wave.isBypassed());
-//    wave_new.setBypassed(!wave_new.isBypassed());
-//    wave_old.setBypassed(!wave_old.isBypassed());
-}
+
 
 //-----------------------------------------------------------------------------------------------
 void ofxWhisper::_updateVAD(){
@@ -260,7 +269,9 @@ void ofxWhisper::_updateVAD(){
 
 //-----------------------------------------------------------------------------------------------
 void ofxWhisper::update(){
-    ofLogNotice("ofxWhisper::update");
+    _lastUpdateStartTime = std::chrono::system_clock::now();
+    
+//    ofLogNotice("ofxWhisper::update");
     // process new audio
     if(audio_input == nullptr) return;
     
@@ -271,6 +282,7 @@ void ofxWhisper::update(){
     }
     _runInference();
     _processResults();
+    _lastUpdateEndTime = std::chrono::system_clock::now();
 }
 
 
@@ -389,9 +401,33 @@ void ofxWhisper::_processResults()
 }
 
 #ifdef USING_OFX_SOUND_OBJECTS
-////-----------------------------------------------------------------------------------------------
-//void ofxWhisper::process(ofSoundBuffer &input, ofSoundBuffer &output) {
-//    if(audio_input) audio_input->audioIn(input);
-//    output = input;
-//}
+
+//-----------------------------------------------------------------------------------------------
+void ofxWhisper::audioIn(ofSoundBuffer &input){
+
+    if(inputObject!=nullptr) {
+        ofLogWarning("ofxWhisper::audioIn") << "ofxWhisper is set as audio input, yet some other ofxSoundObject is connected to this one.";
+    }
+    ofxSoundInput::audioIn(input);
+}
+
+//-----------------------------------------------------------------------------------------------
+void ofxWhisper::audioOut(ofSoundBuffer &output){
+    if(inputObject!=nullptr) {
+        ofxSoundObject::audioOut(output);
+    }else{
+        ofxSoundInput::audioOut(output);
+    }
+}
+
+//-----------------------------------------------------------------------------------------------
+void ofxWhisper::process(ofSoundBuffer &input, ofSoundBuffer &output) {
+    if(audio_input) audio_input->push(input);
+    output = input;
+}
+#else
+//-----------------------------------------------------------------------------------------------
+void ofxWhisper::audioIn(ofSoundBuffer &input){
+    if(audio_input) audio_input->push(input);
+}
 #endif
