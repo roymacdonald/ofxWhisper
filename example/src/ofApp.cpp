@@ -21,7 +21,9 @@ void ofApp::setup(){
     // whisperSettings.language  = "en"; //"spoken language\n",
     // whisperSettings.model     = "models/ggml-base.en.bin"; //"model path\n",
     
+    
     whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-base.en.bin";
+//        whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-base.bin";
 //    whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-large.bin";
     
    
