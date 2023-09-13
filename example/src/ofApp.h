@@ -22,9 +22,14 @@ class ofApp : public ofBaseApp{
 		void windowResized(int w, int h);
 		void dragEvent(ofDragInfo dragInfo);
 		void gotMessage(ofMessage msg);
-	
-    
     
     ofxWhisper whisper;
-    deque<string> textQueue;
+    struct WhisperText{
+        string text;
+        ofRectangle boundingBox;
+    };
+    deque<WhisperText> textQueue;
+    
+    
+    
 };

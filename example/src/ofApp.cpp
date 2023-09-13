@@ -20,52 +20,41 @@ void ofApp::setup(){
     // whisperSettings.no_timestamps = false; 
     // whisperSettings.language  = "en"; //"spoken language\n",
     // whisperSettings.model     = "models/ggml-base.en.bin"; //"model path\n",
-    whisperSettings.model =  "/Users/roy/openFrameworks/addons/ofxWhisper/libs/whisper_cpp/models/ggml-base.en.bin";
-//    whisperSettings.model =  "/Users/roy/openFrameworks/addons/ofxWhisper/libs/whisper_cpp/models/ggml-large.bin";
     
-   
+    whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-base.en.bin";
+//    whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-large.bin";
+    
    
     ofSoundStream soundStream;
     soundStream.printDeviceList();
 
-    ofSoundDevice::Api api = ofSoundDevice::Api::UNSPECIFIED;
-    
+    ofSoundDevice::Api api;
 #ifdef TARGET_WIN32
-    // set your device to the correct api. otherwise it might not work.
-    //windows is a bit quirky about this.
-     auto devices = soundStream.getDeviceList(ofSoundDevice::Api::MS_WASAPI);
-     
-     for (size_t i = 0; i < devices.size(); i++) {
-         cout << i << "  : " << devices[i].name << endl;
-     }
-         
      api = ofSoundDevice::Api::MS_WASAPI;
-
+#else
+    api = ofSoundDevice::Api::UNSPECIFIED;
 #endif   
 
     
     
     // remember to choose the correct input device.
-    int inputDeviceIndex = 3;
+    int inputDeviceIndex = 1;
     int inSampleRate = 48000;
     int bufferSize = 512;
 
     
-    whisper.setup(whisperSettings, inputDeviceIndex , inSampleRate, bufferSize , api);
-    
-
-
+    whisper.setupAudioInput(whisperSettings, inputDeviceIndex, inSampleRate, bufferSize, api);
 
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
     string newText;
+    ofBitmapFont bf;
     while(whisper.textChannel.tryReceive(newText)){
-        textQueue.push_back(newText);
-    }
-    while(textQueue.size() > 50){
-        textQueue.pop_front();
+        textQueue.push_front({newText,
+            bf.getBoundingBox(newText, 0, 0)
+        });
     }
 }
 
@@ -74,14 +63,24 @@ void ofApp::draw(){
     
     ofRectangle r = whisper.draw();
     
-    ofBitmapFont bf;
-    float y = r.getMaxY() + 20;
-    for(auto& t: textQueue){
-        auto r= bf.getBoundingBox(t, 0, 0);
-        ofDrawBitmapStringHighlight(t, 80, y );
-        y += r.height + 8;	
-    }
     
+    float y = r.y + 20;
+    auto x = r.getMaxX() + 20;
+
+    size_t i = 0;
+    for(auto& t: textQueue){
+        
+        ofDrawBitmapStringHighlight(ofToString(i) + " - " + t.text , x, y );
+        y += t.boundingBox.height + 8;
+        i++;
+        if(y+ 100 > ofGetHeight()){
+            break;
+        }
+    }
+    size_t n = textQueue.size();
+    for(; i < n; i ++){
+        textQueue.pop_back();
+    }
     
 }
 
@@ -92,9 +91,7 @@ void ofApp::keyPressed(int key){
 
 //--------------------------------------------------------------
 void ofApp::keyReleased(int key){
-    if(key == ' '){
-        whisper.toggleWaveBypass();
-    }
+    
 }
 
 //--------------------------------------------------------------
