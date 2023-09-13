@@ -1,9 +1,9 @@
-#include "ofxWhisperBuffered.h"
+#include "ofxWhisperBufferResampler.h"
 #include "whisper.h"
 #include "ofxWhisperUtils.h"
 
 //---------------------------------------------------------------------------------------------------------
-ofxWhisperBuffered::ofxWhisperBuffered():
+ofxWhisperBufferResampler::ofxWhisperBufferResampler():
 _rms(0),
 _peak(0),
 _numChannels(0)
@@ -12,12 +12,17 @@ _numChannels(0)
 }
 
 //---------------------------------------------------------------------------------------------------------
-ofxWhisperBuffered::~ofxWhisperBuffered(){
+ofxWhisperBufferResampler::~ofxWhisperBufferResampler(){
 
 }
 
+void ofxWhisperBufferResampler::setup(int numInputChannels, int durationMs){
+    ringBuffer = make_unique<LockFreeRingBuffer>(numInputChannels * WHISPER_SAMPLE_RATE * (durationMs/1000.0f));
+}
+
+
 //---------------------------------------------------------------------------------------------------------
-ofRectangle ofxWhisperBuffered::draw(const ofRectangle& rect){
+ofRectangle ofxWhisperBufferResampler::draw(const ofRectangle& rect){
     
     ofSetColor(0);
     ofFill();
@@ -53,7 +58,7 @@ ofRectangle ofxWhisperBuffered::draw(const ofRectangle& rect){
 }
 
 //---------------------------------------------------------------------------------------------------------
-void ofxWhisperBuffered::push( ofSoundBuffer& buffer){
+void ofxWhisperBufferResampler::push( ofSoundBuffer& buffer){
          if(ringBuffer){
              if(!sampleRateConverter){
                  sampleRateConverter = make_unique<ofxSamplerate>() ;
@@ -73,7 +78,7 @@ void ofxWhisperBuffered::push( ofSoundBuffer& buffer){
 }
 
 //---------------------------------------------------------------------------------------------------------
-bool ofxWhisperBuffered::hasBufferedMs(uint64_t millis){
+bool ofxWhisperBufferResampler::hasBufferedMs(uint64_t millis){
     if(ringBuffer && _numChannels.load() > 0){
         
         return (ringBuffer->getNumReadableSamples() >= (_numChannels.load() * WHISPER_SAMPLE_RATE * millis)/1000.0f);
@@ -84,7 +89,7 @@ bool ofxWhisperBuffered::hasBufferedMs(uint64_t millis){
 }
 
 //---------------------------------------------------------------------------------------------------------
-bool ofxWhisperBuffered::get(ofSoundBuffer& buffer){
+bool ofxWhisperBufferResampler::get(ofSoundBuffer& buffer){
     if( _numChannels.load() == 0) return false;
     
     if(ringBuffer){
@@ -96,37 +101,3 @@ bool ofxWhisperBuffered::get(ofSoundBuffer& buffer){
 }
 
 
-//
-//bool ofxWhisperBuffered::setup(int deviceIndex , int inSampleRate, int bufferSize, int waitDurationMs, ofSoundDevice::Api api){
-//    
-//    auto devices = m_soundStream.getDeviceList(api);
-//        if ( deviceIndex < devices.size()) {
-//            int i = deviceIndex;
-//            ofSoundStreamSettings m_soundSettings;
-//            
-//            m_soundSettings.setInDevice(devices[i]);
-//            m_soundSettings.setInListener(this);
-//            m_soundSettings.numInputChannels = devices[i].inputChannels;
-//            
-//            //You can pass 0 as the value for inSampleRate and then the value will be the highest one available in the chosen device
-//            m_soundSettings.sampleRate = (inSampleRate > 0)?inSampleRate:getMaxValue(devices[i].sampleRates);
-//            m_soundSettings.numBuffers = 2;
-//            m_soundSettings.bufferSize = bufferSize;
-//            
-////            ofLogNotice("BufferedAudioInput::setup") << "setting audio device " << i << ": " << devices[i].name << " sampleRate: " << m_soundSettings.sampleRate;
-//            
-//            wait_duration = waitDurationMs;
-//            
-//            
-//            
-//            ringBuffer = make_unique<LockFreeRingBuffer>(m_soundSettings.numInputChannels * WHISPER_SAMPLE_RATE * (waitDurationMs/1000.0f)*5);// make the ring buffer 10 times larger than the input buffers. This size is enough to perform the most commmon sampleRate convertions, etc
-//            
-//            m_soundStream.setup(m_soundSettings);
-//                    
-//            _isSetup = true;
-//            return true;
-//        }
-//    
-//    _isSetup = false;
-//    return false;
-//}

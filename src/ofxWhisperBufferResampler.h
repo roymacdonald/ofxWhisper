@@ -5,12 +5,14 @@
 #include <atomic>
 #include "LockFreeRingBuffer.h"
 
-class ofxWhisperBuffered:
+class ofxWhisperBufferResampler
 {
 public:
-    ofxWhisperBuffered();
-    virtual ~ofxWhisperBuffered();
-       
+    ofxWhisperBufferResampler();
+    virtual ~ofxWhisperBufferResampler();
+
+    void setup(int numInputChannels, int durationMs);
+    
     bool get(ofSoundBuffer& buffer);
     
     void push( ofSoundBuffer& buffer );
