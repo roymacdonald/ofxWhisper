@@ -1,0 +1,5 @@
+ofxAudioFile
+ofxGui
+ofxSampleRate
+ofxSoundObjects
+ofxWhisper
