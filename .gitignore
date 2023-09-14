@@ -115,3 +115,6 @@ libs/whisper_cpp/models/*
 !libs/whisper_cpp/models/download-ggml-model.sh
 whisper.cpp/
 whisper.cpp/*
+
+testBoundedText/
+testBoundedText/*
