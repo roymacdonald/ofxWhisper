@@ -72,7 +72,7 @@ void ofxWhisperBufferResampler::push( ofSoundBuffer& buffer){
              
              ringBuffer->writeFromBuffer(converted);
              _rms = converted.getRMSAmplitude();
-             _peak = getMaxValue(converted.getBuffer());
+             _peak = ofxWhisper::getMaxValue(converted.getBuffer());
          }
      
 }

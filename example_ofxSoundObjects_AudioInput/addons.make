@@ -1,5 +1,5 @@
 ofxAudioFile
-ofxSampleRate
 ofxGui
+ofxSampleRate
 ofxSoundObjects
 ofxWhisper
