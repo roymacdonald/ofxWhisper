@@ -110,5 +110,8 @@ Desktop.ini
 
 libs/whisper_cpp/models/
 libs/whisper_cpp/models/*
+!libs/whisper_cpp/models/download-coreml-model.sh
+!libs/whisper_cpp/models/download-ggml-model.cmd
+!libs/whisper_cpp/models/download-ggml-model.sh
 whisper.cpp/
 whisper.cpp/*
