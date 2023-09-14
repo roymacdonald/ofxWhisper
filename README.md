@@ -66,9 +66,30 @@ For example:
 
 `libs/whisper_cpp/models/download-coreml-model.sh base.en`.
 
+## Examples
+
+There are 3 examples.
+
+* example_simple
+* example_ofxSoundObjects_AudioInput* example_ofxSoundObjects_AudioPlayer
+
+For the last two you will need [ofxSoundObjects](https://github.com/roymacdonald/ofxSoundObjects/) and [ofxAudioFile](https://github.com/npisanti/ofxAudioFile) installed.
+
+### example_simple
+This will open a sound input (microphone) on your computer and process it with whisper. The results will be drawn on screen.
+Make sure you choose the correct sound device.
+
+
+### example_ofxSoundObjects_AudioInput
+Uses ofxSoundObjects. The way it works is the same as example_simple but it connects trhough a chain of ofxSoundObjects. This allows you to either process the sound input before or after passing trhough whisper, using ofxSoundObjects. Check ofxSoundObjects examples to see how to work with it.
+
+
+### example_ofxSoundObjects_AudioPlayer
+
+Uses ofxSoundObjects. Loads an audiofile, plays it and proceeses it with whisper. 
+
+
 
 ## Last but not least
-Remember to update the example project using Project Generator
+Remember to update the examples project using Project Generator
 
-
-#
