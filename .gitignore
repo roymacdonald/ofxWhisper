@@ -108,7 +108,7 @@ Desktop.ini
 *.sql
 *.sqlite
 
-libs/whisper_cpp/models/
+# libs/whisper_cpp/models/
 libs/whisper_cpp/models/*
 !libs/whisper_cpp/models/download-coreml-model.sh
 !libs/whisper_cpp/models/download-ggml-model.cmd
