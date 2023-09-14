@@ -5,7 +5,6 @@
 #include <deque>
 #include "ofxSoundObjects.h"
 
-#define USE_AUDIO_PLAYER
 
 class ofApp : public ofBaseApp{
 
@@ -28,18 +27,12 @@ class ofApp : public ofBaseApp{
 	
     
     
-    ofxWhisper whisper;
-    struct WhisperText{
-        string text;
-        ofRectangle boundingBox;
-    };
-    deque<WhisperText> textQueue;
+    ofxWhisper::SoundProcessor whisper;
+    
+    deque<ofxWhisper::BoundedText> textQueue;
     
     ofSoundStream m_soundStream;
     
-#ifdef USE_AUDIO_PLAYER
-    ofxSoundPlayerObject player;
-#else
     ofxSoundInput input;
-#endif
+    ofxSoundOutput output;
 };

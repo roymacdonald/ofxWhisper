@@ -23,12 +23,9 @@ class ofApp : public ofBaseApp{
 		void dragEvent(ofDragInfo dragInfo);
 		void gotMessage(ofMessage msg);
     
-    ofxWhisper whisper;
-    struct WhisperText{
-        string text;
-        ofRectangle boundingBox;
-    };
-    deque<WhisperText> textQueue;
+    ofxWhisper::SoundProcessor whisper;
+    
+    deque<ofxWhisper::BoundedText> textQueue;
     
     
     

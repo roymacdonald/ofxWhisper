@@ -2,7 +2,7 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-    ofxWhisperSettings whisperSettings;
+    ofxWhisper::Settings whisperSettings;
     /// Using the default settings which are. Uncomment any line below and change value if needed
      whisperSettings.n_threads  = std::min(4, (int32_t) std::thread::hardware_concurrency());        //n_threads "number of threads to use during computation\n", ;
      whisperSettings.step_ms    = 2000;     //step_ms "audio step size in milliseconds\n",             ;
@@ -21,8 +21,8 @@ void ofApp::setup(){
     // whisperSettings.language  = "en"; //"spoken language\n",
     // whisperSettings.model     = "models/ggml-base.en.bin"; //"model path\n",
     
-    
-    whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-base.en.bin";
+    /// MAKE SURE YOU CHANGE THIS TO THE CORRECT PATH!
+    whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-base.bin";
 //        whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-base.bin";
 //    whisperSettings.model =  "../../../../../addons/ofxWhisper/libs/whisper_cpp/models/ggml-large.bin";
     
@@ -52,11 +52,18 @@ void ofApp::setup(){
 //--------------------------------------------------------------
 void ofApp::update(){
     string newText;
-    ofBitmapFont bf;
+    
+    bool bUpdatePositions = false;
     while(whisper.textChannel.tryReceive(newText)){
-        textQueue.push_front({newText,
-            bf.getBoundingBox(newText, 0, 0)
-        });
+        textQueue.push_back({newText});
+        bUpdatePositions = true;
+    }
+    if(bUpdatePositions){
+        ofxWhisper::updateTextPositions(textQueue,
+                            true, //bool removeIfOffscreen,
+                            30, //float startYPos ,
+                            8, //float spacing = 8,
+                            20); // float bottomMargin = 20
     }
 }
 
@@ -64,24 +71,10 @@ void ofApp::update(){
 void ofApp::draw(){
     
     ofRectangle r = whisper.draw();
-    
-    
-    float y = r.y + 20;
     auto x = r.getMaxX() + 20;
 
-    size_t i = 0;
     for(auto& t: textQueue){
-        
-        ofDrawBitmapStringHighlight(ofToString(i) + " - " + t.text , x, y );
-        y += t.boundingBox.height + 8;
-        i++;
-        if(y+ 100 > ofGetHeight()){
-            break;
-        }
-    }
-    size_t n = textQueue.size();
-    for(; i < n; i ++){
-        textQueue.pop_back();
+        ofDrawBitmapStringHighlight( t.text , x, t.boundingBox.y );
     }
     
 }

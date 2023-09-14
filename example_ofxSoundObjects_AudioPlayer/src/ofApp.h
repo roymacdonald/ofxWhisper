@@ -26,12 +26,9 @@ class ofApp : public ofBaseApp{
 	
     
     
-    ofxWhisper whisper;
-    struct WhisperText{
-        string text;
-        ofRectangle boundingBox;
-    };
-    deque<WhisperText> textQueue;
+    ofxWhisper::SoundProcessor whisper;
+
+    deque<ofxWhisper::BoundedText> textQueue;
     
     ofSoundStream soundStream;
     
