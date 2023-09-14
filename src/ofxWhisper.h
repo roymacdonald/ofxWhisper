@@ -8,6 +8,7 @@
 #include "ofUtils.h"
 #include "ofLog.h"
 #include "ofxWhisperBufferResampler.h"
+#include "ofxWhisperUtils.h"
 
 #ifdef USING_OFX_SOUND_OBJECTS
 #include "ofxSoundObjects.h"
@@ -15,8 +16,8 @@
 //#include "waveformDraw.h"
 
 #include <chrono>
-
-struct ofxWhisperSettings {
+namespace ofxWhisper {
+struct Settings {
     //n_threads "number of threads to use during computation\n", ;
     int32_t n_threads  = std::min(4, (int32_t) std::thread::hardware_concurrency());
     
@@ -50,7 +51,7 @@ struct ofxWhisperSettings {
 };
 
 
-class ofxWhisper: public ofThread
+class SoundProcessor: public ofThread
 #ifdef USING_OFX_SOUND_OBJECTS
 , public ofxSoundInput
 #else
@@ -59,7 +60,7 @@ class ofxWhisper: public ofThread
 
 {
     
-    ofxWhisperSettings settings;
+    ofxWhisper::Settings settings;
     int n_samples_step = 0;
     int n_samples_len = 0;
     int n_samples_keep = 0;
@@ -67,12 +68,12 @@ class ofxWhisper: public ofThread
     int n_new_line = 1;
     bool bIsSetup = false;
     
-
+    
     struct whisper_context * ctx ;
     int n_iter = 0;
-
+    
     std::vector<whisper_token> prompt_tokens;
-
+    
     std::mutex wait_mutex;
     std::condition_variable wait_cond_var;
     
@@ -85,7 +86,7 @@ class ofxWhisper: public ofThread
     bool _isReadyToUpdate();
     void _updateNoVAD();
     void _updateVAD();
-
+    
     ofBitmapFont bf;
     uint64_t lastUpdate = 0;
     
@@ -97,14 +98,18 @@ public:
     std::atomic<uint64_t> updatePeriod;
     
     
-    virtual ~ofxWhisper();
-    ofxWhisper();
+    virtual ~SoundProcessor();
+    SoundProcessor();
     
-   
-    bool setupAudioInput(const ofxWhisperSettings& whisperSettings, size_t deviceIndex, int sampleRate = 48000, int bufferSize = 512, ofSoundDevice::Api api = ofSoundDevice::Api::UNSPECIFIED);
-
+    
+    // call this setup function if you want to handle externaly the sound stream, as when you use it as an ofxSoundObject that receives the sound data from elsewhere
+    void setup(const ofxWhisper::Settings& _settings, int numInputChannels);
+    
+    // call this function if you want this object to handle the input sound stream
+    bool setupAudioInput(const ofxWhisper::Settings& whisperSettings, size_t deviceIndex, int sampleRate = 48000, int bufferSize = 512, ofSoundDevice::Api api = ofSoundDevice::Api::UNSPECIFIED);
+    
     ofRectangle draw();
-    ofThreadChannel<std::string> textChannel;    
+    ofThreadChannel<std::string> textChannel;
     
 #ifdef USING_OFX_SOUND_OBJECTS
     virtual void process(ofSoundBuffer &input, ofSoundBuffer &output) override;
@@ -114,13 +119,13 @@ public:
     virtual void audioIn(ofSoundBuffer &input) override;
 #endif
     
-
+    
     std::string getInfoString();
     
-    void setup(const ofxWhisperSettings& _settings, int numInputChannels);
-
+    
+    
     std::string to_timestamp(int64_t t) ;
-
+    
 protected:
     virtual void threadedFunction() override;
     unique_ptr<ofxWhisperBufferResampler> audio_input = nullptr;
@@ -128,3 +133,4 @@ protected:
     
     
 };
+}
